@@ -4,6 +4,9 @@ Revision history for DBIx::Class
     * Fixes
         - Correctly recognize root source unqualified columns when
           resolving right-side ordered limited prefetch
+        - Stop Sybase ASE storage from generating invalid SQL in subselects
+          when a limit without offset is encountered
+
 
 ### Unreleased changes merged from master
     * New Features / Changes
