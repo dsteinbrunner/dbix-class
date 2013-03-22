@@ -719,7 +719,7 @@ sub _extract_order_criteria {
     my @chunks;
     for ($sql_maker->_order_by_chunks ($order_by) ) {
       my $chunk = ref $_ ? $_ : [ $_ ];
-      $chunk->[0] =~ s/\s+ (?: ASC|DESC ) \s* $//ix;
+      ($chunk->[0]) = $sql_maker->_split_order_chunk($chunk->[0]);
       push @chunks, $chunk;
     }
 

@@ -358,12 +358,8 @@ sub _prep_for_skimming_limit {
     for my $ch ($self->_order_by_chunks ($inner_order)) {
       $ch = $ch->[0] if ref $ch eq 'ARRAY';
 
-      my $is_desc = (
-        $ch =~ s/\s+ ( ASC|DESC ) \s* $//ix
-          and
-        uc($1) eq 'DESC'
-      ) ? 1 : 0;
-      push @out_chunks, \join (' ', $ch, $is_desc ? 'ASC' : 'DESC' );
+      ($ch, my ($dir, $nulls)) = $self->_split_order_chunk($ch);
+      push @out_chunks, \join (' ', $ch, ($dir eq 'ASC' ? 'DESC' : 'ASC'), ($nulls ? ('NULLS', ($nulls eq 'FIRST' ? 'LAST' : 'FIRST')) : ()) );
     }
 
     $sq_attrs->{order_by_middle} = $self->_order_by (\@out_chunks);
@@ -572,9 +568,7 @@ sub _GenericSubQ {
   . 'unique-column order criteria.'
   );
 
-  my $direction = (
-    $first_order_by =~ s/\s+ ( ASC|DESC ) \s* $//ix
-  ) ? lc($1) : 'asc';
+  ($first_order_by, my $direction) = $self->_split_order_chunk($first_order_by);
 
   my ($first_ord_alias, $first_ord_col) = $first_order_by =~ /^ (?: ([^\.]+) \. )? ([^\.]+) $/x;
 
@@ -596,7 +590,7 @@ sub _GenericSubQ {
     $self->_subqueried_limit_attrs ($sql, $rs_attrs);
   };
 
-  my $cmp_op = $direction eq 'desc' ? '>' : '<';
+  my $cmp_op = $direction eq 'DESC' ? '>' : '<';
   my $count_tbl_alias = 'rownum__emulation';
 
   my ($order_sql, @order_bind) = do {
@@ -760,7 +754,7 @@ sub _subqueried_limit_attrs {
   for my $chunk ($self->_order_by_chunks ($rs_attrs->{order_by})) {
     # order with bind
     $chunk = $chunk->[0] if (ref $chunk) eq 'ARRAY';
-    $chunk =~ s/\s+ (?: ASC|DESC ) \s* $//ix;
+    ($chunk) = $self->_split_order_chunk($chunk);
 
     next if $in_sel_index->{$chunk};
 

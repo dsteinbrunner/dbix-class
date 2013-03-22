@@ -319,6 +319,17 @@ sub _order_by {
   }
 }
 
+sub _split_order_chunk {
+    my ($self, $chunk) = @_;
+
+    $chunk =~ s/(?: \s+ (ASC|DESC) )? (?: \s+ NULLS \s+ (FIRST|LAST) )? \s* $//ix;
+    # The substitution always succeeds, since all the parts are optional
+    my $dir = uc ($1||'ASC');
+    my $nulls = uc ($2||'');
+
+    return ($chunk, $dir, $nulls);
+}
+
 sub _table {
 # optimized due to hotttnesss
 #  my ($self, $from) = @_;
