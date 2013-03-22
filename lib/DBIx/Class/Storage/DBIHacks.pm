@@ -268,6 +268,7 @@ sub _adjust_select_args_for_complex_prefetch {
           # skip ourselves
           next if $chunk =~ $own_re;
 
+# <<<<<<< FIXME - need to handle -nulls => first/last somehow
           ($chunk, my $is_desc) = $sql_maker->_split_order_chunk($chunk);
 
           # maybe our own unqualified column

@@ -358,10 +358,15 @@ sub _prep_for_skimming_limit {
     for my $ch ($self->_order_by_chunks ($inner_order)) {
       $ch = $ch->[0] if ref $ch eq 'ARRAY';
 
-      ($ch, my $is_desc) = $self->_split_order_chunk($ch);
+      ($ch, my ($is_desc, $nulls_pos) ) = $self->_split_order_chunk($ch);
 
-      # !NOTE! outsie chunks come in reverse order ( !$is_desc )
-      push @out_chunks, { ($is_desc ? '-asc' : '-desc') => \$ch };
+      # !NOTE! outside chunks come in reverse order ( !$is_desc, !$nulls_pos )
+      push @out_chunks, {
+        ($is_desc ? '-asc' : '-desc') => \$ch,
+        $nulls_pos ? (
+          -nulls => ($nulls_pos eq 'FIRST' ? 'LAST' : 'FIRST')
+        ) : (),
+      };
     }
 
     $sq_attrs->{order_by_middle} = $self->_order_by (\@out_chunks);
@@ -581,6 +586,7 @@ sub _GenericSubQ {
 
   for my $bit (@order_bits) {
 
+# <<<<<<< FIXME - need to handle -nulls => first/last somehow
     ($bit, my $is_desc) = $self->_split_order_chunk($bit);
 
     push @is_desc, $is_desc;
