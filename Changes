@@ -1,5 +1,10 @@
 Revision history for DBIx::Class
 
+### Unreleased changes from topic branch
+    * Fixes
+        - Correctly recognize root source unqualified columns when
+          resolving right-side ordered limited prefetch
+
 ### Unreleased changes merged from master
     * New Features / Changes
         - Officially deprecate the 'cols' and 'include_columns' resultset
