@@ -1,5 +1,14 @@
 Revision history for DBIx::Class
 
+### Unreleased changes merged from master
+    * New Features / Changes
+        - Officially deprecate the 'cols' and 'include_columns' resultset
+          attributes
+
+    * Fixes
+        - Audit and correct potential bugs associated with braindead reuse
+          of $1 on unsuccessful matches
+
 0.08242-TRIAL (EXPERIMENTAL BETA RELEASE) 2013-03-10 14:44 (UTC)
     * New Features / Changes
         - Prefetch with limit on right-side ordered resultsets now works
