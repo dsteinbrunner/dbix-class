@@ -27,10 +27,6 @@ Currently the enhancements to L<SQL::Abstract> are:
 
 =item * Support of C<...FOR UPDATE> type of select statement modifiers
 
-=item * The L</-ident> operator
-
-=item * The L</-value> operator
-
 =back
 
 =cut
@@ -91,9 +87,6 @@ BEGIN {
     my($func) = (caller(1))[3];
     __PACKAGE__->throw_exception("[$func] Fatal: " . join ('',  @_));
   };
-
-  # Current SQLA pollutes its namespace - clean for the time being
-  namespace::clean->clean_subroutines(qw/SQL::Abstract carp croak confess/);
 }
 
 # the "oh noes offset/top without limit" constant
@@ -211,50 +204,84 @@ my $for_syntax = {
 };
 sub _lock_select {
   my ($self, $type) = @_;
-  my $sql = $for_syntax->{$type} || $self->throw_exception( "Unknown SELECT .. FOR type '$type' requested" );
+
+  my $sql;
+  if (ref($type) eq 'SCALAR') {
+    $sql = "FOR $$type";
+  }
+  else {
+    $sql = $for_syntax->{$type} || $self->throw_exception( "Unknown SELECT .. FOR type '$type' requested" );
+  }
+
   return " $sql";
+}
+
+sub _split_order_chunk {
+  my ($self, $chunk) = @_;
+
+  # strip off sort modifiers, but always succeed, so $1 gets reset
+  $chunk =~ s/ (?: \s+ (ASC|DESC) )? \s* $//ix;
+
+  return (
+    $chunk,
+    ( $1 and uc($1) eq 'DESC' ) ? 1 : 0,
+  );
 }
 
 sub _recurse_from {
   scalar shift->_render_sqla(table => \@_);
 }
 
+# This is hideously ugly, but SQLA does not understand multicol IN expressions
+# FIXME TEMPORARY - DQ should have native syntax for this
+# moved here to raise API questions
+#
+# !!! EXPERIMENTAL API !!! WILL CHANGE !!!
+sub _where_op_multicolumn_in {
+  my ($self, $lhs, $rhs) = @_;
+
+  if (! ref $lhs or ref $lhs eq 'ARRAY') {
+    my (@sql, @bind);
+    for (ref $lhs ? @$lhs : $lhs) {
+      if (! ref $_) {
+        push @sql, $self->_quote($_);
+      }
+      elsif (ref $_ eq 'SCALAR') {
+        push @sql, $$_;
+      }
+      elsif (ref $_ eq 'REF' and ref $$_ eq 'ARRAY') {
+        my ($s, @b) = @$$_;
+        push @sql, $s;
+        push @bind, @b;
+      }
+      else {
+        $self->throw_exception("ARRAY of @{[ ref $_ ]}es unsupported for multicolumn IN lhs...");
+      }
+    }
+    $lhs = \[ join(', ', @sql), @bind];
+  }
+  elsif (ref $lhs eq 'SCALAR') {
+    $lhs = \[ $$lhs ];
+  }
+  elsif (ref $lhs eq 'REF' and ref $$lhs eq 'ARRAY' ) {
+    # noop
+  }
+  else {
+    $self->throw_exception( ref($lhs) . "es unsupported for multicolumn IN lhs...");
+  }
+
+  # is this proper...?
+  $rhs = \[ $self->_recurse_where($rhs) ];
+
+  for ($lhs, $rhs) {
+    $$_->[0] = "( $$_->[0] )"
+      unless $$_->[0] =~ /^ \s* \( .* \) \s* ^/xs;
+  }
+
+  \[ join( ' IN ', shift @$$lhs, shift @$$rhs ), @$$lhs, @$$rhs ];
+}
+
 1;
-
-=head1 OPERATORS
-
-=head2 -ident
-
-Used to explicitly specify an SQL identifier. Takes a plain string as value
-which is then invariably treated as a column name (and is being properly
-quoted if quoting has been requested). Most useful for comparison of two
-columns:
-
-    my %where = (
-        priority => { '<', 2 },
-        requestor => { -ident => 'submitter' }
-    );
-
-which results in:
-
-    $stmt = 'WHERE "priority" < ? AND "requestor" = "submitter"';
-    @bind = ('2');
-
-=head2 -value
-
-The -value operator signals that the argument to the right is a raw bind value.
-It will be passed straight to DBI, without invoking any of the SQL::Abstract
-condition-parsing logic. This allows you to, for example, pass an array as a
-column value for databases that support array datatypes, e.g.:
-
-    my %where = (
-        array => { -value => [1, 2, 3] }
-    );
-
-which results in:
-
-    $stmt = 'WHERE array = ?';
-    @bind = ([1, 2, 3]);
 
 =head1 AUTHORS
 

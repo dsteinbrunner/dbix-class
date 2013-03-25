@@ -5,7 +5,6 @@ use warnings;
 
 use base 'DBIx::Class';
 use DBIx::Class::Carp;
-use DBIx::Class::Exception;
 
 use Data::Query::Constants qw(DQ_IDENTIFIER);
 
@@ -110,7 +109,7 @@ sub new {
 
     if ($colmap->{$select} and $rsrc->_identifying_column_set([$colmap->{$select}])) {
       $new_attrs->{group_by} = [ $select ];
-      delete $new_attrs->{distinct}; # it is ignored when group_by is present
+      delete @{$new_attrs}{qw(distinct _grouped_by_distinct)}; # it is ignored when group_by is present
     }
     else {
       carp (
@@ -130,7 +129,7 @@ sub new {
 
 =item Arguments: none
 
-=item Return Value: \[ $sql, @bind ]
+=item Return Value: \[ $sql, L<@bind_values|DBIx::Class::ResultSet/DBIC BIND VALUES> ]
 
 =back
 
@@ -183,7 +182,7 @@ Returns all values of the column in the resultset (or C<undef> if
 there are none).
 
 Much like L<DBIx::Class::ResultSet/all> but returns values rather
-than row objects.
+than result objects.
 
 =cut
 
@@ -298,7 +297,7 @@ sub min {
 
 =item Arguments: none
 
-=item Return Value: $resultset
+=item Return Value: L<$resultset|DBIx::Class::ResultSet>
 
 =back
 
@@ -337,7 +336,7 @@ sub max {
 
 =item Arguments: none
 
-=item Return Value: $resultset
+=item Return Value: L<$resultset|DBIx::Class::ResultSet>
 
 =back
 
@@ -376,7 +375,7 @@ sub sum {
 
 =item Arguments: none
 
-=item Return Value: $resultset
+=item Return Value: L<$resultset|DBIx::Class::ResultSet>
 
 =back
 
@@ -425,7 +424,7 @@ sub func {
 
 =item Arguments: $function
 
-=item Return Value: $resultset
+=item Return Value: L<$resultset|DBIx::Class::ResultSet>
 
 =back
 
@@ -435,12 +434,19 @@ Creates the resultset that C<func()> uses to run its query.
 
 sub func_rs {
   my ($self,$function) = @_;
-  return $self->{_parent_resultset}->search(
-    undef, {
-      select => {$function => $self->{_select}},
-      as => [$self->{_as}],
-    },
-  );
+
+  my $rs = $self->{_parent_resultset};
+  my $select = $self->{_select};
+
+  # wrap a grouped rs
+  if ($rs->_resolved_attrs->{group_by}) {
+    $select = $self->{_as};
+    $rs = $rs->as_subselect_rs;
+  }
+
+  $rs->search( undef, {
+    columns => { $self->{_as} => { $function => $select } }
+  } );
 }
 
 =head2 throw_exception
@@ -450,7 +456,7 @@ See L<DBIx::Class::Schema/throw_exception> for details.
 =cut
 
 sub throw_exception {
-  my $self=shift;
+  my $self = shift;
 
   if (ref $self && $self->{_parent_resultset}) {
     $self->{_parent_resultset}->throw_exception(@_);
@@ -484,11 +490,9 @@ sub _resultset {
 
 1;
 
-=head1 AUTHORS
+=head1 AUTHOR AND CONTRIBUTORS
 
-Luke Saunders <luke.saunders@gmail.com>
-
-Jess Robinson
+See L<AUTHOR|DBIx::Class/AUTHOR> and L<CONTRIBUTORS|DBIx::Class/CONTRIBUTORS> in DBIx::Class
 
 =head1 LICENSE
 

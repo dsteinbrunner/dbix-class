@@ -253,11 +253,13 @@ is ($collapsed_or_rs->all, 4, 'Collapsed joined search with OR returned correct 
 is ($collapsed_or_rs->count, 4, 'Collapsed search count with OR ok');
 
 # make sure sure distinct on a grouped rs is warned about
-my $cd_rs = $schema->resultset ('CD')
-              ->search ({}, { distinct => 1, group_by => 'title' });
-warnings_exist (sub {
-  $cd_rs->next;
-}, qr/Useless use of distinct/, 'UUoD warning');
+{
+  my $cd_rs = $schema->resultset ('CD')
+                ->search ({}, { distinct => 1, group_by => 'title' });
+  warnings_exist (sub {
+    $cd_rs->next;
+  }, qr/Useless use of distinct/, 'UUoD warning');
+}
 
 {
   my $tcount = $schema->resultset('Track')->search(
@@ -297,6 +299,14 @@ is($rel_rs->count, 5, 'Related search ok');
 is($or_rs->next->cdid, $rel_rs->next->cdid, 'Related object ok');
 $or_rs->reset;
 $rel_rs->reset;
+
+# at this point there should be no active statements
+# (finish() was called everywhere, either explicitly via
+# reset() or on DESTROY)
+for (keys %{$schema->storage->dbh->{CachedKids}}) {
+  fail("Unreachable cached statement still active: $_")
+    if $schema->storage->dbh->{CachedKids}{$_}->FETCH('Active');
+}
 
 my $tag = $schema->resultset('Tag')->search(
                [ { 'me.tag' => 'Blue' } ], { cols=>[qw/tagid/] } )->next;
@@ -553,12 +563,21 @@ lives_ok (sub { my $newlink = $newbook->link}, "stringify to false value doesn't
   );
 }
 
+# test to make sure that calling ->new() on a resultset object gives
+# us a row object
+{
+    my $new_artist = $schema->resultset('Artist')->new({});
+    isa_ok( $new_artist, 'DBIx::Class::Row', '$rs->new gives a row object' );
+}
+
+
 # make sure we got rid of the compat shims
 SKIP: {
-    skip "Remove in 0.082", 3 if $DBIx::Class::VERSION < 0.082;
+    my $remove_version = 0.083;
+    skip "Remove in $remove_version", 3 if $DBIx::Class::VERSION < $remove_version;
 
     for (qw/compare_relationship_keys pk_depends_on resolve_condition/) {
-      ok (! DBIx::Class::ResultSource->can ($_), "$_ no longer provided by DBIx::Class::ResultSource");
+      ok (! DBIx::Class::ResultSource->can ($_), "$_ no longer provided by DBIx::Class::ResultSource, removed before $remove_version");
     }
 }
 

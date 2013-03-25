@@ -69,7 +69,6 @@ sub _prep_for_execute {
 
 sub _execute {
   my $self = shift;
-  my ($op) = @_;
 
   # always list ctx - we need the $sth
   my ($rv, $sth, @bind) = $self->next::method(@_);
@@ -119,8 +118,8 @@ sub _select_args_to_query {
     $self->sqla_converter->_order_by_to_dq($attrs->{order_by})
   ) {
     $self->throw_exception(
-      'An ordered subselect encountered - this is not safe! Please see "Ordered Subselects" in DBIx::Class::Storage::DBI::MSSQL
-    ') unless $attrs->{unsafe_subselect_ok};
+      'An ordered subselect encountered - this is not safe! Please see "Ordered Subselects" in DBIx::Class::Storage::DBI::MSSQL'
+    ) unless $attrs->{unsafe_subselect_ok};
     my $max = $self->sql_maker->__max_int;
     $sql =~ s/^ \s* SELECT \s/SELECT TOP $max /xi;
   }

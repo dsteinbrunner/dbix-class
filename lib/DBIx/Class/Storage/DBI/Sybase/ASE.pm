@@ -18,7 +18,7 @@ use Try::Tiny;
 use Context::Preserve 'preserve_context';
 use namespace::clean;
 
-__PACKAGE__->sql_limit_dialect ('RowCountOrGenericSubQ');
+__PACKAGE__->sql_limit_dialect ('GenericSubQ');
 __PACKAGE__->sql_quote_char ([qw/[ ]/]);
 __PACKAGE__->datetime_parser_type(
   'DBIx::Class::Storage::DBI::Sybase::ASE::DateTime::Format'
@@ -254,14 +254,15 @@ sub _is_lob_column {
 }
 
 sub _prep_for_execute {
-  my $self = shift;
-  my ($op, $ident) = @_;
+  my ($self, $op, $ident, $args) = @_;
 
   #
 ### This is commented out because all tests pass. However I am leaving it
 ### here as it may prove necessary (can't think through all combinations)
 ### BTW it doesn't currently work exactly - need better sensitivity to
   # currently set value
+  #
+  #my ($op, $ident) = @_;
   #
   # inherit these from the parent for the duration of _prep_for_execute
   # Don't know how to make a localizing loop with if's, otherwise I would
@@ -272,7 +273,20 @@ sub _prep_for_execute {
   #  = $self->_parent_storage->_perform_autoinc_retrieval
   #if ($op eq 'insert' or $op eq 'update') and $self->_parent_storage;
 
-  my ($sql, $bind) = $self->next::method (@_);
+  my $limit;  # extract and use shortcut on limit without offset
+  if ($op eq 'select' and ! $args->[4] and $limit = $args->[3]) {
+    $args = [ @$args ];
+    $args->[3] = undef;
+  }
+
+  my ($sql, $bind) = $self->next::method($op, $ident, $args);
+
+  # $limit is already sanitized by now
+  $sql = join( "\n",
+    "SET ROWCOUNT $limit",
+    $sql,
+    "SET ROWCOUNT 0",
+  ) if $limit;
 
   if (my $identity_col = $self->_perform_autoinc_retrieval) {
     $sql .= "\n" . $self->_fetch_identity_sql($ident, $identity_col)
@@ -322,8 +336,6 @@ sub _native_data_type {
 
 sub _execute {
   my $self = shift;
-  my ($op) = @_;
-
   my ($rv, $sth, @bind) = $self->next::method(@_);
 
   $self->_identity( ($sth->fetchall_arrayref)->[0][0] )
@@ -1067,6 +1079,18 @@ for information on changing the setting on the server side.
 
 See L</connect_call_datetime_setup> to setup date formats
 for L<DBIx::Class::InflateColumn::DateTime>.
+
+=head1 LIMITED QUERIES
+
+Because ASE does not have a good way to limit results in SQL that works for all
+types of queries, the limit dialect is set to
+L<GenericSubQ|SQL::Abstract::Limit/GenericSubQ>.
+
+Fortunately, ASE and L<DBD::Sybase> support cursors properly, so when
+L<GenericSubQ|SQL::Abstract::Limit/GenericSubQ> is too slow you can use
+the L<software_limit|DBIx::Class::ResultSet/software_limit>
+L<DBIx::Class::ResultSet> attribute to simulate limited queries by skipping over
+records.
 
 =head1 TEXT/IMAGE COLUMNS
 

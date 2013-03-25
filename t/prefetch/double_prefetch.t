@@ -1,4 +1,5 @@
 use warnings;
+use strict;
 
 use Test::More;
 use lib qw(t/lib);
@@ -6,8 +7,6 @@ use DBIC::SqlMakerTest;
 use DBICTest;
 
 my $schema = DBICTest->init_schema();
-
-plan tests => 1;
 
 # While this is a rather GIGO case, make sure it behaves as pre-103,
 # as it may result in hard-to-track bugs
@@ -32,3 +31,5 @@ is_same_sql(
       LEFT JOIN cd cd ON cd.cdid = single_track_2.cd
   )',
 );
+
+done_testing;

@@ -1,5 +1,191 @@
 Revision history for DBIx::Class
 
+### Unreleased changes from topic branch
+    * Fixes
+        - Correctly recognize root source unqualified columns when
+          resolving right-side ordered limited prefetch
+        - Even more robust behavior of GenericSubQuery limit dialect
+        - Stop Sybase ASE storage from generating invalid SQL in subselects
+          when a limit without offset is encountered
+
+
+### Unreleased changes merged from master
+    * New Features / Changes
+        - Officially deprecate the 'cols' and 'include_columns' resultset
+          attributes
+
+    * Fixes
+        - Audit and correct potential bugs associated with braindead reuse
+          of $1 on unsuccessful matches
+
+0.08242-TRIAL (EXPERIMENTAL BETA RELEASE) 2013-03-10 14:44 (UTC)
+    * New Features / Changes
+        - Prefetch with limit on right-side ordered resultsets now works
+          correctly (via aggregated grouping)
+        - Changing the result_class of a ResultSet in progress is now
+          explicitly forbidden. The behavior was undefined before, and
+          would result in wildly differing outcomes depending on $rs
+          attributes.
+        - Scale back validation of the 'as' attribute - in the field
+          there are legitimate-ish uses of a inflating into an apparently
+          invalid relationship graph
+        - Warn in case of iterative collapse being upgraded to an eager
+          cursor slurp
+        - No longer order the insides of a complex prefetch subquery,
+          unless required to satisfy a limit
+
+    * Fixes
+        - Properly consider unselected order_by criteria during complex
+          subqueried prefetch
+        - Properly support "MySQL-style" left-side group_by with prefetch
+        - Fix $grouped_rs->get_column($col)->func($func) producing incorrect
+          SQL (RT#81127)
+
+0.08209 2013-03-01 12:56 (UTC)
+    * New Features / Changes
+        - Debugging aid - warn on invalid result objects created by what
+          seems like an invalid inheritance hierarchy
+
+    * Fixes
+        - Fix another embarrassing regression preventing correct refining of
+          the search criteria on a prefetched relation (broken in 0.08205)
+        - Fix incorrect callsite reporting by DBIC::Carp
+
+0.08208 2013-02-20 09:56 (UTC)
+    * New Features / Changes
+        - A bunch of nonsensically named arguments to the SQL::Translator
+          parser have been marked as deprecated (while still fully
+          supported)
+
+    * Fixes
+        - Fix duplicated selected columns when calling 'count' when a same
+          aggregate function is used more than once in a 'having' clause
+          (RT#83305)
+        - Prevent SQL::Translator::Producer::YAML from seeing the $dbh
+          in a potentially connected $schema instance (RT#75394)
+
+    * Misc
+        - Fixup our distbuilding process to stop creating world-writable
+          tarball contents (implicitly fixes RT#83084)
+        - Added strict and warnings tests for all lib and test files
+
+0.08241-TRIAL (EXPERIMENTAL BETA RELEASE) 2013-02-20 11:37 (UTC)
+    * New Features / Changes
+        - Revert to passing the original (pre-0.08240) arguments to
+          inflate_result() and remove the warning about ResultClass
+          inheritance.
+        - Optimize the generated rowparsers even more - no user-visible
+          changes.
+        - Emit a warning on incorrect use of nullable columns within a
+          primary key
+
+0.08240-TRIAL (EXPERIMENTAL BETA RELEASE) 2013-02-14 05:56 (UTC)
+    * New Features / Changes
+        - Rewrite from scratch the result constructor codepath - many bugfixes
+          and performance improvements (the current codebase is now capable of
+          outperforming both DBIx::DataModel and Rose::DB::Object on some
+          workloads). Some notable benefits:
+          - Multiple has_many prefetch
+          - Partial prefetch - you now can select only columns you are
+            interested in, while preserving the collapse functionality
+            (collapse is now exposed as a first-class API attribute)
+          - Prefetch of resultsets with arbitrary order
+            (RT#54949, RT#74024, RT#74584)
+          - Prefetch no longer inserts right-side table order_by clauses
+            (massively helps the deficient MySQL optimizer)
+        - Massively optimize codepath around ->cursor(), over 10x speedup
+          on some iterating workloads.
+
+    * Fixes
+        - Fix open cursors silently resetting when inherited across a fork
+          or a thread
+        - Fix duplicated selected columns when calling 'count' when a same
+          aggregate function is used more than once in a 'having' clause
+          (RT#83305)
+
+    * Misc
+        - Fixup our distbuilding process to stop creating world-writable
+          tarball contents (implicitly fixes RT#83084)
+        - Added strict and warnings tests for all lib and test files
+
+0.08206 2013-02-08
+    * Fixes
+        - Fix dbh_do() failing to properly reconnect (regression in 0.08205)
+        - Extra sanity check of a fresh DBI handle ($dbh). Fixes
+          connection coderefs returning garbage (seen in the wild)
+
+    * Misc
+        - Only allow known globals in SQL::Translator leak allowance
+        - General cleanup of error message texts - quote names/identifiers
+          for easier reading
+        - Stop t/52leaks.t from failing when AUTOMATED_TESTING=1
+
+0.08205 2013-01-22
+    * New Features / Changes
+        - The emulate_limit() arbitrary limit dialect emulation mechanism is
+          now deprecated, and will be removed when DBIx::Class migrates to
+          Data::Query
+        - Support for the source_bind_attributes() storage method has been
+          removed after a lengthy deprecation cycle
+    * Fixes
+        - When performing resultset update/delete only strip condition
+          qualifiers - leave the source name alone (RT#80015, RT#78844)
+        - Fix incorrect behavior on resultset update/delete invoked on
+          composite resultsets (e.g. as_subselect_rs)
+        - Fix update/delete operations referencing the updated table failing
+          on MySQL, due to its refusal to modify a table being directly
+          queried. As a workaround induce in-memory temp-table creation
+          (RT#81378, RT#81897)
+        - More robust behavior under heavily threaded environments - make
+          sure we do not have refaddr reuse in the global storage registry
+        - Fix failing test on 5.8 under Win32 (RT#81114)
+        - Fix hash-randomization test issues (RT#81638)
+        - Disallow erroneous calling of connect_info on a replicated storage
+          (RT#78436)
+    * Misc
+        - Improve the populate docs in ::Schema and ::ResultSet
+        - ::Storage::DBI::source_bind_attributes() removed as announced
+          on Jan 2011 in 0e773352a
+
+0.08204 2012-11-08
+    * New Features / Changes
+        - SQLMaker now accepts \'literal' with the 'for' rs attribute as an
+          override to the builtin FOR options
+    * Fixes
+        - Fix unique constraint violations in Ordered.pm blanket movement
+          (RT#79773, rolls back short-sighted 5e6fde33e)
+        - Fix API mismatch between new_result() and new_related() (originally
+          broken by fea3d045)
+        - Fix test failure on perl 5.8
+    * Misc
+        - Much more extensive diagnostics when a new RDBMS/DSN combination is
+          encountered (RT#80431)
+
+0.08203 2012-10-18
+    * Fixes
+        - Really fix inadequate $dbh->ping SQLite implementation (what shipped
+          in 0.08201 tickled other deficiencies in DBD::SQLite itself)
+
+0.08202 2012-10-06
+    * Fixes
+        - Replace inadequate $dbh->ping SQLite implementation with our own,
+          fixes RT#78420
+
+0.08200 2012-08-24 (UTC)
+    * Fixes
+        - Change one of the new tests for the previous release to not require
+          SQL::Translator
+
+0.08199 2012-08-22 (UTC)
+    * Fixes
+        - Roll back incomplete (and broken) internal changes - restore prefetch functionality
+
+0.08198 2012-07-11 03:43 (UTC)
+    * Fixes
+        - Fix a number of Win32 Test issues
+        - Fix silent Oracle connection failures
+
+0.08197 2012-07-10 10:32 (UTC)
     * New Features / Changes
         - Issue a warning when DateTime objects are passed to ->search
         - Fast populate() in void context is now even more efficient by

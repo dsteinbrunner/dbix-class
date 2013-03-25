@@ -34,13 +34,13 @@ my $schema = DBICTest->init_schema();
     is ($rs->result_class, 'DBICTest::CDSubclass', 'original class unchanged');
     is ($hri_rs->result_class, 'DBIx::Class::ResultClass::HashRefInflator', 'result_class accessor pre-set via attribute');
 
-
     my $datahashref1 = $hri_rs->next;
     is_deeply(
       [ sort keys %$datahashref1 ],
       [ sort $rs->result_source->columns ],
       'returned correct columns',
     );
+    $hri_rs->reset;
 
     $cd = $hri_rs->find ({cdid => 1});
     is_deeply ( $cd, $datahashref1, 'first/find return the same thing (result_class attr propagates)');
