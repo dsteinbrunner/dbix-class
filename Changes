@@ -4,6 +4,8 @@ Revision history for DBIx::Class
     * Fixes
         - Correctly recognize root source unqualified columns when
           resolving right-side ordered limited prefetch
+        - Stop erroneously considering order_by criteria from a join under
+          distinct => 1 (the distinct should apply to the main source only)
         - Even more robust behavior of GenericSubQuery limit dialect
         - Stop Sybase ASE storage from generating invalid SQL in subselects
           when a limit without offset is encountered
